@@ -1,395 +1,351 @@
 import { useState, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
+import { Mic, UploadCloud, Copy, Trash2, FileDown } from "lucide-react"
+import { jsPDF } from "jspdf"
 
-export default function App() {
+export default function App(){
 
-  const [recording, setRecording] = useState(false)
-  const [transcription, setTranscription] = useState("")
-  const [history, setHistory] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [fileName, setFileName] = useState("")
-  const [loadingHistory, setLoadingHistory] = useState(true)
-  const [search, setSearch] = useState("")
+const [recording,setRecording]=useState(false)
+const [transcription,setTranscription]=useState("")
+const [history,setHistory]=useState([])
+const [status,setStatus]=useState("Awaiting Signal")
+const [loading,setLoading]=useState(false)
+const [fileName,setFileName]=useState("")
 
-  const recorderRef = useRef(null)
-  const chunksRef = useRef([])
+const recorderRef=useRef(null)
+const chunksRef=useRef([])
 
-  // FETCH HISTORY
-  const fetchHistory = async () => {
-    try {
 
-      const res = await fetch("http://localhost:5000/history")
-      const data = await res.json()
+// FETCH HISTORY
+const fetchHistory=async()=>{
+try{
+const res=await fetch("http://localhost:5000/history")
+const data=await res.json()
+if(Array.isArray(data)) setHistory(data)
+}catch(err){console.log(err)}
+}
 
-      if (Array.isArray(data)) {
-        setHistory(data)
-      }
+useEffect(()=>{fetchHistory()},[])
 
-    } catch (err) {
-      console.log("History error:", err)
-    }
 
-    setLoadingHistory(false)
-  }
+// RECORDING
+const startRecording=async()=>{
+try{
+const stream=await navigator.mediaDevices.getUserMedia({audio:true})
+const recorder=new MediaRecorder(stream)
 
-  useEffect(() => {
-    fetchHistory()
-  }, [])
+recorderRef.current=recorder
+chunksRef.current=[]
 
-  // RECORD
-  const startRecording = async () => {
+recorder.ondataavailable=e=>chunksRef.current.push(e.data)
 
-    try {
+recorder.onstop=()=>{
+const blob=new Blob(chunksRef.current,{type:"audio/webm"})
+const formData=new FormData()
+formData.append("audio",blob,"recording.webm")
+sendAudio(formData)
+}
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+recorder.start()
+setRecording(true)
+setStatus("Recording")
 
-      const recorder = new MediaRecorder(stream)
+}catch{
+alert("Microphone permission denied")
+}
+}
 
-      recorderRef.current = recorder
-      chunksRef.current = []
+const stopRecording=()=>{
+recorderRef.current.stop()
+setRecording(false)
+setStatus("Processing")
+}
 
-      recorder.ondataavailable = e => chunksRef.current.push(e.data)
 
-      recorder.onstop = async () => {
+// UPLOAD
+const uploadFile=e=>{
+const file=e.target.files[0]
+if(!file)return
 
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" })
+setFileName(file.name)
 
-        const formData = new FormData()
-        formData.append("audio", blob, "recording.webm")
+const formData=new FormData()
+formData.append("audio",file)
 
-        sendAudio(formData)
+sendAudio(formData)
+}
 
-      }
 
-      recorder.start()
-      setRecording(true)
+// SEND AUDIO
+const sendAudio=async(formData)=>{
+try{
 
-    } catch {
+setLoading(true)
 
-      alert("Microphone permission denied")
+const res=await fetch("http://localhost:5000/upload",{
+method:"POST",
+body:formData
+})
 
-    }
+const data=await res.json()
 
-  }
+if(data.transcription){
+setTranscription(data.transcription)
+setStatus("Completed")
+}
 
-  const stopRecording = () => {
+fetchHistory()
 
-    if (recorderRef.current) {
-      recorderRef.current.stop()
-      setRecording(false)
-    }
+}catch{
+alert("Speech recognition failed")
+}
 
-  }
+setLoading(false)
+}
 
-  // UPLOAD
-  const uploadFile = e => {
 
-    const file = e.target.files[0]
+// DELETE
+const deleteItem=async(id)=>{
+await fetch(`http://localhost:5000/delete/${id}`,{method:"DELETE"})
+fetchHistory()
+}
 
-    if (!file) return
 
-    setFileName(file.name)
+// COPY TEXT
+const copyText=()=>{
+navigator.clipboard.writeText(transcription)
+}
 
-    const formData = new FormData()
-    formData.append("audio", file)
 
-    sendAudio(formData)
+// DOWNLOAD PDF
+const downloadPDF=()=>{
+const pdf=new jsPDF()
+pdf.text(transcription||"No transcription",10,10)
+pdf.save("transcription.pdf")
+}
 
-  }
 
-  // SEND AUDIO
-  const sendAudio = async formData => {
+// DOWNLOAD TXT
+const downloadTxt=text=>{
+const blob=new Blob([text],{type:"text/plain"})
+const a=document.createElement("a")
+a.href=URL.createObjectURL(blob)
+a.download="transcription.txt"
+a.click()
+}
 
-    try {
 
-      setLoading(true)
+return(
 
-      const res = await fetch("http://localhost:5000/upload", {
-        method: "POST",
-        body: formData
-      })
+<div className="min-h-screen bg-gradient-to-br from-[#020617] via-[#020617] to-[#0f172a] text-white">
 
-      const data = await res.json()
 
-      if (data.transcription) {
-        setTranscription(data.transcription)
-      }
+{/* NAVBAR */}
 
-      fetchHistory()
+<nav className="flex justify-between items-center px-4 md:px-8 py-4 border-b border-white/10 backdrop-blur-xl bg-black/30">
 
-    } catch {
+<h1 className="text-lg md:text-xl font-bold text-purple-400">
+SpeechScribe
+</h1>
 
-      alert("Speech to text failed")
+<div className="text-gray-400 text-sm md:text-base">
+Studio
+</div>
 
-    }
+</nav>
 
-    setLoading(false)
 
-  }
 
-  // DELETE
-  const deleteItem = async id => {
+{/* HERO */}
 
-    await fetch(`http://localhost:5000/delete/${id}`, {
-      method: "DELETE"
-    })
+<div className="max-w-7xl mx-auto p-4 md:p-8">
 
-    fetchHistory()
+<span className="bg-purple-500/20 text-purple-400 px-3 py-1 rounded-full text-xs">
+AI Pipeline Ready
+</span>
 
-  }
+<h1 className="text-2xl md:text-4xl font-bold mt-4">
+AI Speech Recognition & Transcription
+</h1>
 
-  // DOWNLOAD
-  const downloadText = text => {
+<p className="text-gray-400 mt-2 text-sm md:text-base">
+Convert spoken audio into accurate text using advanced AI speech recognition.
+</p>
 
-    const blob = new Blob([text], { type: "text/plain" })
 
-    const a = document.createElement("a")
-    a.href = URL.createObjectURL(blob)
-    a.download = "transcription.txt"
 
-    a.click()
+{/* GRID */}
 
-  }
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-10">
 
-  const filteredHistory = history.filter(item =>
-    item.transcription.toLowerCase().includes(search.toLowerCase())
-  )
 
-  return (
 
-    <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#020617] to-black text-white p-8">
+{/* LEFT PANEL */}
 
-      {/* HEADER */}
+<div className="space-y-6">
 
-      <motion.div
-        initial={{ opacity:0, y:-20 }}
-        animate={{ opacity:1, y:0 }}
-        className="mb-12"
-      >
 
-        <h1 className="text-4xl font-bold text-blue-400">
-          VoiceScribe AI
-        </h1>
+{/* STATUS */}
 
-        <p className="text-gray-400">
-          Intelligent Speech-to-Text Transcription
-        </p>
+<div className="text-sm text-purple-400">
+Status: {status}
+</div>
 
-      </motion.div>
 
-      <div className="grid lg:grid-cols-2 gap-10">
+{/* RECORD BUTTON */}
 
-        {/* LEFT SIDE */}
+<motion.button
+whileHover={{scale:1.05}}
+whileTap={{scale:0.95}}
+onClick={recording?stopRecording:startRecording}
+className={`w-full py-4 rounded-xl flex items-center justify-center gap-2 text-sm md:text-base
+${recording?"bg-red-500":"bg-gradient-to-r from-purple-500 to-blue-500"}`}
+>
 
-        <div className="space-y-8">
+<Mic/>
 
-          {/* AUDIO PANEL */}
+{recording?"Stop Recording":"Start Recording"}
 
-          <motion.div
-            initial={{ opacity:0, x:-30 }}
-            animate={{ opacity:1, x:0 }}
-            className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-2xl shadow-2xl"
-          >
+</motion.button>
 
-            <h2 className="text-xl mb-6 text-blue-400">
-              Audio Input
-            </h2>
 
-            {!recording ? (
 
-              <motion.button
-                whileHover={{ scale:1.05 }}
-                whileTap={{ scale:0.95 }}
-                onClick={startRecording}
-                className="w-full bg-gradient-to-r from-blue-500 to-purple-600 py-10 rounded-xl text-lg font-semibold shadow-lg"
-              >
-                🎤 Start Recording
-              </motion.button>
+{/* RECORDING ANIMATION */}
 
-            ) : (
+{recording && (
+<div className="flex justify-center gap-2">
+{[...Array(5)].map((_,i)=>(
+<motion.div
+key={i}
+animate={{height:[10,30,10]}}
+transition={{repeat:Infinity,duration:0.8,delay:i*0.1}}
+className="w-2 bg-red-400 rounded"
+/>
+))}
+</div>
+)}
 
-              <motion.button
-                animate={{ scale:[1,1.1,1] }}
-                transition={{ repeat:Infinity, duration:1 }}
-                onClick={stopRecording}
-                className="w-full bg-red-500 py-10 rounded-xl text-lg font-semibold"
-              >
-                ⏹ Stop Recording
-              </motion.button>
 
-            )}
 
-            {/* RECORDING WAVES */}
+{/* UPLOAD CARD */}
 
-            {recording && (
-              <div className="flex justify-center gap-2 mt-6">
-                {[...Array(5)].map((_,i)=>(
-                  <motion.div
-                    key={i}
-                    animate={{ height:[10,30,10] }}
-                    transition={{ repeat:Infinity, duration:0.8, delay:i*0.1 }}
-                    className="w-2 bg-red-400 rounded"
-                  />
-                ))}
-              </div>
-            )}
+<label className="border-2 border-dashed border-white/20 p-6 md:p-8 rounded-xl flex flex-col items-center cursor-pointer hover:border-purple-500 transition">
 
-            {/* UPLOAD */}
+<UploadCloud size={36} className="text-purple-400 mb-2"/>
 
-            <label className="block border border-dashed border-gray-600 mt-6 p-6 rounded-xl text-center cursor-pointer hover:bg-white/5 transition">
+<p className="text-gray-300 text-sm md:text-base">Upload Audio</p>
 
-              Upload Audio File
+<p className="text-xs text-gray-500">MP3 • WAV • M4A</p>
 
-              <input
-                type="file"
-                accept="audio/*"
-                className="hidden"
-                onChange={uploadFile}
-              />
+<input
+type="file"
+accept="audio/*"
+className="hidden"
+onChange={uploadFile}
+/>
 
-            </label>
+</label>
 
-            <p className="text-gray-400 text-sm mt-3">
-              {fileName || "No audio selected"}
-            </p>
+<p className="text-gray-400 text-sm">
+{fileName||"No audio selected"}
+</p>
 
-          </motion.div>
 
-          {/* HISTORY */}
 
-          <motion.div
-            initial={{ opacity:0, x:-30 }}
-            animate={{ opacity:1, x:0 }}
-            className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-2xl"
-          >
+{/* HISTORY */}
 
-            <div className="flex justify-between mb-4">
+<div className="bg-white/5 border border-white/10 rounded-xl p-4 max-h-80 overflow-y-auto">
 
-              <h2 className="text-purple-400 font-semibold">
-                History
-              </h2>
+<h2 className="text-purple-400 mb-4">History</h2>
 
-              <span className="text-gray-400 text-sm">
-                {history.length} items
-              </span>
+{history.map(item=>(
 
-            </div>
+<div key={item._id} className="bg-[#0f172a] p-3 rounded-lg mb-3">
 
-            {/* SEARCH */}
+<p className="text-sm">{item.transcription}</p>
 
-            <input
-              placeholder="Search history..."
-              value={search}
-              onChange={e=>setSearch(e.target.value)}
-              className="w-full mb-4 p-2 rounded bg-black/40 border border-white/10"
-            />
+<p className="text-xs text-gray-400 mt-1">
+{new Date(item.createdAt).toLocaleString()}
+</p>
 
-            {loadingHistory ? (
+<audio controls className="mt-2 w-full">
+<source src={`http://localhost:5000${item.filepath}`} />
+</audio>
 
-              <p className="text-gray-400">Loading history...</p>
+<div className="flex gap-2 mt-2">
 
-            ) : (
+<button
+onClick={()=>downloadTxt(item.transcription)}
+className="text-xs bg-blue-500 px-2 py-1 rounded"
+>
+<FileDown size={14}/>
+</button>
 
-              <div className="space-y-4 max-h-80 overflow-y-auto">
+<button
+onClick={()=>deleteItem(item._id)}
+className="text-xs bg-red-500 px-2 py-1 rounded"
+>
+<Trash2 size={14}/>
+</button>
 
-                <AnimatePresence>
+</div>
 
-                  {filteredHistory.map(item => (
+</div>
 
-                    <motion.div
-                      key={item._id}
-                      initial={{ opacity:0, y:10 }}
-                      animate={{ opacity:1, y:0 }}
-                      whileHover={{ scale:1.02 }}
-                      className="bg-[#0f172a] border border-white/10 p-4 rounded-xl"
-                    >
+))}
 
-                      <p className="text-sm">
-                        {item.transcription}
-                      </p>
+</div>
 
-                      <p className="text-xs text-gray-400 mt-2">
-                        {new Date(item.createdAt).toLocaleString()}
-                      </p>
+</div>
 
-                      <audio controls className="mt-2 w-full">
-                        <source src={`http://localhost:5000${item.filepath}`} />
-                      </audio>
 
-                      <div className="flex gap-3 mt-3">
 
-                        <button
-                          onClick={()=>downloadText(item.transcription)}
-                          className="text-xs bg-blue-500 px-3 py-1 rounded hover:bg-blue-600"
-                        >
-                          Download
-                        </button>
+{/* RIGHT PANEL */}
 
-                        <button
-                          onClick={()=>deleteItem(item._id)}
-                          className="text-xs bg-red-500 px-3 py-1 rounded hover:bg-red-600"
-                        >
-                          Delete
-                        </button>
+<div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-6 flex flex-col min-h-[300px]">
 
-                      </div>
+<div className="flex justify-between mb-4">
 
-                    </motion.div>
+<h2 className="text-purple-400">
+Live Transcript
+</h2>
 
-                  ))}
+<div className="flex gap-3">
 
-                </AnimatePresence>
+<button onClick={copyText}>
+<Copy size={18}/>
+</button>
 
-              </div>
+<button onClick={downloadPDF}>
+<FileDown size={18}/>
+</button>
 
-            )}
+</div>
 
-          </motion.div>
+</div>
 
-        </div>
+<div className="flex-1 overflow-y-auto text-gray-200 leading-relaxed text-sm md:text-base">
 
-        {/* RIGHT PANEL */}
+{loading ? (
+<motion.div
+animate={{rotate:360}}
+transition={{repeat:Infinity,duration:1}}
+className="w-8 h-8 border-4 border-purple-400 border-t-transparent rounded-full mx-auto"
+/>
+) : (
+transcription || "Awaiting signal..."
+)}
 
-        <motion.div
-          initial={{ opacity:0, x:30 }}
-          animate={{ opacity:1, x:0 }}
-          className="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-2xl"
-        >
+</div>
 
-          <h2 className="text-xl mb-6 text-blue-400">
-            Transcription
-          </h2>
+</div>
 
-          {loading ? (
+</div>
 
-            <motion.div
-              animate={{ rotate:360 }}
-              transition={{ repeat:Infinity, duration:1 }}
-              className="w-10 h-10 border-4 border-blue-400 border-t-transparent rounded-full mx-auto"
-            />
+</div>
 
-          ) : transcription ? (
+</div>
 
-            <motion.p
-              initial={{ opacity:0 }}
-              animate={{ opacity:1 }}
-              className="text-lg leading-relaxed"
-            >
-              {transcription}
-            </motion.p>
+)
 
-          ) : (
-
-            <p className="text-gray-400 text-center mt-20">
-              Record or upload audio to see transcription
-            </p>
-
-          )}
-
-        </motion.div>
-
-      </div>
-
-    </div>
-  )
 }
