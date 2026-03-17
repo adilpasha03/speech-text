@@ -12,7 +12,6 @@ const Audio = require("./models/Audio")
 const app = express()
 
 // Middleware
-const cors = require("cors")
 
 app.use(cors({
   origin: "https://speech-text-web.netlify.app"
