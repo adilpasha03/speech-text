@@ -19,7 +19,7 @@ const chunksRef=useRef([])
 // FETCH HISTORY
 const fetchHistory=async()=>{
 try{
-const res=await fetch("http://localhost:5000/history")
+const res=await fetch("https://backend-vtvz.onrender.com")
 const data=await res.json()
 if(Array.isArray(data)) setHistory(data)
 }catch(err){console.log(err)}
@@ -82,7 +82,7 @@ try{
 
 setLoading(true)
 
-const res=await fetch("http://localhost:5000/upload",{
+const res=await fetch("https://backend-vtvz.onrender.com",{
 method:"POST",
 body:formData
 })
@@ -106,7 +106,7 @@ setLoading(false)
 
 // DELETE
 const deleteItem=async(id)=>{
-await fetch(`http://localhost:5000/delete/${id}`,{method:"DELETE"})
+await fetch(`https://backend-vtvz.onrender.com/delete/${id}`,{method:"DELETE"})
 fetchHistory()
 }
 
@@ -269,7 +269,7 @@ onChange={uploadFile}
 </p>
 
 <audio controls className="mt-2 w-full">
-<source src={`http://localhost:5000${item.filepath}`} />
+<source src={`https://backend-vtvz.onrender.com${item.filepath}`} />
 </audio>
 
 <div className="flex gap-2 mt-2">
