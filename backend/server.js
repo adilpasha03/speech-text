@@ -34,7 +34,7 @@ app.get("/", (req, res) => {
 
 
 // Multer storage setup
-const storage = multer.diskStorage({
+const storage = multer.memoryStorage({
 
   destination: function (req, file, cb) {
     cb(null, "uploads/")
@@ -52,58 +52,48 @@ const upload = multer({ storage })
 // Upload API (Speech → Text)
 app.post("/upload", upload.single("audio"), async (req, res) => {
 
-  try {
+try {
 
-    const audioPath = `uploads/${req.file.filename}`
+if (!req.file) {
+return res.status(400).json({ error: "No audio file received" })
+}
 
-    const audioBuffer = fs.readFileSync(audioPath)
+const response = await axios.post(
+"https://api.deepgram.com/v1/listen",
+req.file.buffer,
+{
+headers: {
+Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
+"Content-Type": req.file.mimetype
+}
+}
+)
 
-    const response = await axios.post(
-      "https://api.deepgram.com/v1/listen",
-      audioBuffer,
-      {
-        headers: {
-          Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
-          "Content-Type": req.file.mimetype
-        }
-      }
-    )
+const transcriptionText =
+response.data.results.channels[0].alternatives[0].transcript
 
-    const transcriptionText =
-      response.data.results.channels[0].alternatives[0].transcript
-
-
-    // Save to MongoDB
-    const newAudio = new Audio({
-
-      filename: req.file.filename,
-
-      filepath: `/uploads/${req.file.filename}`,
-
-      transcription: transcriptionText
-
-    })
-
-    await newAudio.save()
-
-
-    res.json({
-      transcription: transcriptionText
-    })
-
-  } catch (error) {
-
-    console.log("Deepgram Error:", error.response?.data || error.message)
-
-    res.status(500).json({
-      error: "Speech to text failed"
-    })
-
-  }
-
+const newAudio = new Audio({
+filename: req.file.originalname,
+transcription: transcriptionText
 })
 
+await newAudio.save()
 
+res.json({
+transcription: transcriptionText
+})
+
+} catch (error) {
+
+console.log(error)
+
+res.status(500).json({
+error: "Speech recognition failed"
+})
+
+}
+
+})
 // Get History API
 app.get("/history", async (req, res) => {
 
