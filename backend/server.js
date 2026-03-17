@@ -12,10 +12,7 @@ const Audio = require("./models/Audio")
 const app = express()
 
 // Middleware
-app.use(cors({
-  origin: "https://speech-text-web.netlify.app"
-}))
-
+app.use(cors())
 app.use(express.json())
 
 // Serve uploaded audio files
@@ -54,7 +51,9 @@ app.post("/upload", upload.single("audio"), async (req, res) => {
 
   try {
 
-    const audioBuffer = req.file.buffer
+    const audioPath = `uploads/${req.file.filename}`
+
+    const audioBuffer = fs.readFileSync(audioPath)
 
     const response = await axios.post(
       "https://api.deepgram.com/v1/listen",
@@ -70,12 +69,20 @@ app.post("/upload", upload.single("audio"), async (req, res) => {
     const transcriptionText =
       response.data.results.channels[0].alternatives[0].transcript
 
+
+    // Save to MongoDB
     const newAudio = new Audio({
-      filename: req.file.originalname,
+
+      filename: req.file.filename,
+
+      filepath: `/uploads/${req.file.filename}`,
+
       transcription: transcriptionText
+
     })
 
     await newAudio.save()
+
 
     res.json({
       transcription: transcriptionText
@@ -83,7 +90,7 @@ app.post("/upload", upload.single("audio"), async (req, res) => {
 
   } catch (error) {
 
-    console.log(error)
+    console.log("Deepgram Error:", error.response?.data || error.message)
 
     res.status(500).json({
       error: "Speech to text failed"
@@ -141,8 +148,10 @@ app.delete("/delete/:id", async (req, res) => {
 
 
 // Server start
-const PORT = process.env.PORT || 5000;
+const PORT = 5000
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+  console.log(`Server running on port ${PORT}`)
+
+})

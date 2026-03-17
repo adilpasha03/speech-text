@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from "react"
-import { motion } from "framer-motion"
-import { Mic, UploadCloud, Copy, Trash2, FileDown } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Mic, UploadCloud, Copy, Trash2, FileDown, LogOut, User } from "lucide-react"
 import { jsPDF } from "jspdf"
-
-const API_URL = "https://backend-vtvz.onrender.com"
 
 export default function App(){
 
@@ -21,103 +19,70 @@ const chunksRef=useRef([])
 // FETCH HISTORY
 const fetchHistory=async()=>{
 try{
-
-const res=await fetch(`${API_URL}/history`)
+const res=await fetch("https://backend-vtvz.onrender.com/history")
 const data=await res.json()
-
-if(Array.isArray(data)){
-setHistory(data)
+if(Array.isArray(data)) setHistory(data)
+}catch(err){console.log(err)}
 }
 
-}catch(err){
-console.log("History error:",err)
-}
-}
-
-useEffect(()=>{
-fetchHistory()
-},[])
+useEffect(()=>{fetchHistory()},[])
 
 
-// START RECORDING
+// RECORDING
 const startRecording=async()=>{
-
 try{
-
 const stream=await navigator.mediaDevices.getUserMedia({audio:true})
 const recorder=new MediaRecorder(stream)
 
 recorderRef.current=recorder
 chunksRef.current=[]
 
-recorder.ondataavailable=e=>{
-chunksRef.current.push(e.data)
-}
+recorder.ondataavailable=e=>chunksRef.current.push(e.data)
 
 recorder.onstop=()=>{
-
 const blob=new Blob(chunksRef.current,{type:"audio/webm"})
 const formData=new FormData()
-
 formData.append("audio",blob,"recording.webm")
-
 sendAudio(formData)
-
 }
 
 recorder.start()
-
 setRecording(true)
 setStatus("Recording")
 
 }catch{
-
 alert("Microphone permission denied")
-
+}
 }
 
-}
-
-
-// STOP RECORDING
 const stopRecording=()=>{
-
-if(recorderRef.current){
 recorderRef.current.stop()
-}
-
 setRecording(false)
 setStatus("Processing")
-
 }
 
 
-// UPLOAD FILE
+// UPLOAD
 const uploadFile=e=>{
-
 const file=e.target.files[0]
-
-if(!file) return
+if(!file)return
 
 setFileName(file.name)
 
 const formData=new FormData()
-
 formData.append("audio",file)
 
 sendAudio(formData)
-
 }
 
 
-// SEND AUDIO TO BACKEND
+// SEND AUDIO
 const sendAudio=async(formData)=>{
-
 try{
 
 setLoading(true)
 
-const res=await fetch(`${API_URL}/upload`,{
+const res=await fetch("https://backend-vtvz.onrender.com/upload",{
 method:"POST",
 body:formData
 })
@@ -125,83 +90,48 @@ body:formData
 const data=await res.json()
 
 if(data.transcription){
-
 setTranscription(data.transcription)
 setStatus("Completed")
-
-}else{
-
-setStatus("No speech detected")
-
 }
 
 fetchHistory()
 
-}catch(err){
-
-console.log(err)
+}catch{
 alert("Speech recognition failed")
-
 }
 
 setLoading(false)
-
 }
 
 
-// DELETE HISTORY
+// DELETE
 const deleteItem=async(id)=>{
-
-try{
-
-await fetch(`${API_URL}/delete/${id}`,{
-method:"DELETE"
-})
-
+await fetch(`https://backend-vtvz.onrender.com/delete/${id}`,{method:"DELETE"})
 fetchHistory()
-
-}catch(err){
-
-console.log("Delete error:",err)
-
-}
-
 }
 
 
 // COPY TEXT
 const copyText=()=>{
-
 navigator.clipboard.writeText(transcription)
-
 }
 
 
 // DOWNLOAD PDF
 const downloadPDF=()=>{
-
 const pdf=new jsPDF()
-
-pdf.text(transcription || "No transcription",10,10)
-
+pdf.text(transcription||"No transcription",10,10)
 pdf.save("transcription.pdf")
-
 }
 
 
 // DOWNLOAD TXT
 const downloadTxt=text=>{
-
 const blob=new Blob([text],{type:"text/plain"})
-
 const a=document.createElement("a")
-
 a.href=URL.createObjectURL(blob)
-
 a.download="transcription.txt"
-
 a.click()
-
 }
 
 
@@ -211,14 +141,26 @@ return(
 
 {/* NAVBAR */}
 
-<nav className="flex justify-between items-center px-4 md:px-8 py-4 border-b border-white/10 backdrop-blur-xl bg-black/30">
+<nav className="flex justify-between items-center px-8 py-4 border-b border-white/10 backdrop-blur-xl bg-black/30">
 
-<h1 className="text-lg md:text-xl font-bold text-purple-400">
+<div className="flex items-center gap-6">
+
+<h1 className="text-xl font-bold text-purple-400">
 SpeechScribe
 </h1>
 
-<div className="text-gray-400 text-sm md:text-base">
-Studio
+<div className="flex gap-6 text-gray-400">
+<span className="hover:text-white cursor-pointer">Studio</span>
+<span className="hover:text-white cursor-pointer">Archives</span>
+</div>
+
+</div>
+
+<div className="flex items-center gap-4">
+<User size={20}/>
+<button className="flex items-center gap-1 text-red-400 hover:text-red-500">
+<LogOut size={16}/> Logout
+</button>
 </div>
 
 </nav>
@@ -226,24 +168,24 @@ Studio
 
 {/* HERO */}
 
-<div className="max-w-7xl mx-auto p-4 md:p-8">
+<div className="max-w-7xl mx-auto p-8">
 
 <span className="bg-purple-500/20 text-purple-400 px-3 py-1 rounded-full text-xs">
 AI Pipeline Ready
 </span>
 
-<h1 className="text-2xl md:text-4xl font-bold mt-4">
+<h1 className="text-4xl font-bold mt-4">
 AI Speech Recognition & Transcription
 </h1>
 
-<p className="text-gray-400 mt-2 text-sm md:text-base">
+<p className="text-gray-400 mt-2">
 Convert spoken audio into accurate text using advanced AI speech recognition.
 </p>
 
 
 {/* GRID */}
 
-<div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-10">
+<div className="grid lg:grid-cols-2 gap-10 mt-10">
 
 
 {/* LEFT PANEL */}
@@ -251,16 +193,20 @@ Convert spoken audio into accurate text using advanced AI speech recognition.
 <div className="space-y-6">
 
 
+{/* STATUS */}
+
 <div className="text-sm text-purple-400">
 Status: {status}
 </div>
 
 
+{/* RECORD BUTTON */}
+
 <motion.button
 whileHover={{scale:1.05}}
 whileTap={{scale:0.95}}
 onClick={recording?stopRecording:startRecording}
-className={`w-full py-4 rounded-xl flex items-center justify-center gap-2 text-sm md:text-base
+className={`w-full py-4 rounded-xl flex items-center justify-center gap-2
 ${recording?"bg-red-500":"bg-gradient-to-r from-purple-500 to-blue-500"}`}
 >
 
@@ -271,29 +217,29 @@ ${recording?"bg-red-500":"bg-gradient-to-r from-purple-500 to-blue-500"}`}
 </motion.button>
 
 
+{/* RECORDING ANIMATION */}
+
 {recording && (
 <div className="flex justify-center gap-2">
-
 {[...Array(5)].map((_,i)=>(
-
 <motion.div
 key={i}
 animate={{height:[10,30,10]}}
 transition={{repeat:Infinity,duration:0.8,delay:i*0.1}}
 className="w-2 bg-red-400 rounded"
 />
-
 ))}
-
 </div>
 )}
 
 
-<label className="border-2 border-dashed border-white/20 p-6 md:p-8 rounded-xl flex flex-col items-center cursor-pointer hover:border-purple-500 transition">
+{/* UPLOAD CARD */}
 
-<UploadCloud size={36} className="text-purple-400 mb-2"/>
+<label className="border-2 border-dashed border-white/20 p-8 rounded-xl flex flex-col items-center cursor-pointer hover:border-purple-500 transition">
 
-<p className="text-gray-300 text-sm md:text-base">Upload Audio</p>
+<UploadCloud size={40} className="text-purple-400 mb-2"/>
+
+<p className="text-gray-300">Upload Audio</p>
 
 <p className="text-xs text-gray-500">MP3 • WAV • M4A</p>
 
@@ -305,7 +251,6 @@ onChange={uploadFile}
 />
 
 </label>
-
 
 <p className="text-gray-400 text-sm">
 {fileName||"No audio selected"}
@@ -329,7 +274,7 @@ onChange={uploadFile}
 </p>
 
 <audio controls className="mt-2 w-full">
-<source src={`${API_URL}${item.filepath}`} />
+<source src={`https://backend-vtvz.onrender.com${item.filepath}`} />
 </audio>
 
 <div className="flex gap-2 mt-2">
@@ -361,7 +306,7 @@ className="text-xs bg-red-500 px-2 py-1 rounded"
 
 {/* RIGHT PANEL */}
 
-<div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-6 flex flex-col min-h-[300px]">
+<div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col">
 
 <div className="flex justify-between mb-4">
 
@@ -383,20 +328,16 @@ Live Transcript
 
 </div>
 
-<div className="flex-1 overflow-y-auto text-gray-200 leading-relaxed text-sm md:text-base">
+<div className="flex-1 overflow-y-auto text-gray-200 leading-relaxed">
 
 {loading ? (
-
 <motion.div
 animate={{rotate:360}}
 transition={{repeat:Infinity,duration:1}}
 className="w-8 h-8 border-4 border-purple-400 border-t-transparent rounded-full mx-auto"
 />
-
 ) : (
-
 transcription || "Awaiting signal..."
-
 )}
 
 </div>
