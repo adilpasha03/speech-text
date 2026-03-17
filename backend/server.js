@@ -54,9 +54,7 @@ app.post("/upload", upload.single("audio"), async (req, res) => {
 
   try {
 
-    const audioPath = `uploads/${req.file.filename}`
-
-    const audioBuffer = fs.readFileSync(audioPath)
+    const audioBuffer = req.file.buffer
 
     const response = await axios.post(
       "https://api.deepgram.com/v1/listen",
@@ -72,20 +70,12 @@ app.post("/upload", upload.single("audio"), async (req, res) => {
     const transcriptionText =
       response.data.results.channels[0].alternatives[0].transcript
 
-
-    // Save to MongoDB
     const newAudio = new Audio({
-
-      filename: req.file.filename,
-
-      filepath: `/uploads/${req.file.filename}`,
-
+      filename: req.file.originalname,
       transcription: transcriptionText
-
     })
 
     await newAudio.save()
-
 
     res.json({
       transcription: transcriptionText
@@ -93,7 +83,7 @@ app.post("/upload", upload.single("audio"), async (req, res) => {
 
   } catch (error) {
 
-    console.log("Deepgram Error:", error.response?.data || error.message)
+    console.log(error)
 
     res.status(500).json({
       error: "Speech to text failed"
