@@ -15,7 +15,7 @@ const app = express()
 
 app.use(cors({
   origin: "https://speech-text-web.netlify.app"
-}))
+}));
 app.use(express.json())
 
 // Serve uploaded audio files
