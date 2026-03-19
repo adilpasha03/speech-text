@@ -97,4 +97,16 @@ User → Frontend (React) → Backend (Node.js & Express) → Deepgram API → T
 ### Clone the repository
 
 ```bash
-git clone https://github.com/adilpasha03/your-repo-name.git
+git clone https://github.com/adilpasha03/speech-text.git
+
+## Live Demo
+
+Frontend (User Interface):  
+ https://speech-text-web.netlify.app  
+
+Backend API:  
+ https://backend-vtvz.onrender.com  
+
+---
+
+
